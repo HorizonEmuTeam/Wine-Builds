@@ -32,7 +32,7 @@ diff -uNr a/server/request.c b/server/request.c
 +    len += sizeof("/data/data/com.antutu.ABenchMark/files/usr/tmp/.wine");
      if (!(server_dir = malloc( len ))) fatal_error( "out of memory\n" );
 -    sprintf( server_dir, "/tmp/.wine-%u", getuid() );
-+    strcpy( server_dir, "/data/data/com.antutu.ABenchMark/files/usr/tmp/.wine" );
++    strcpy( server_dir, "/data/data/com.antutu.ABenchMark/files/usr/tmp/.wine-%u" );
  #endif
      create_dir( server_dir, &st2 );
  
