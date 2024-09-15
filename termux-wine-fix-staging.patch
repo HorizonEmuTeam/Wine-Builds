@@ -11,8 +11,8 @@ index b08a31a9..15c992cf 100644
 +        set_case_insensitive( "drive_d" );
          symlink( "../drive_c", "dosdevices/c:" );
 -        symlink( "/", "dosdevices/z:" );
-+        symlink( "/sdcard", "dosdevices/d:" );
-+        symlink( "/data/data/com.termux/files", "dosdevices/z:" );
++        symlink( "/sdcard/Download", "dosdevices/d:" );
++        symlink( "/data/data/com.antutu.ABenchMark/files", "dosdevices/z:" );
      }
      else if (errno != EEXIST) fatal_perror( "cannot create %s/dosdevices", config_dir );
  
