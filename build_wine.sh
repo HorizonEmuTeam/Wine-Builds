@@ -257,7 +257,7 @@ fi
 
 # Replace the "latest" parameter with the actual latest Wine version
 if [ "${WINE_VERSION}" = "latest" ] || [ -z "${WINE_VERSION}" ]; then
-	WINE_VERSION="$(wget -q -O - "https://raw.githubusercontent.com/wine-mirror/wine/master/VERSION" | tail -c +14)"
+	WINE_VERSION="$(wget -q -O - "https://raw.githubusercontent.com/HorizonEmuTeam/Wine-8.18/main/VERSION" | tail -c +14)"
 fi
 
 # Stable and Development versions have a different source code location
@@ -337,7 +337,7 @@ elif [ "$WINE_BRANCH" = "proton" ]; then
 	fi
 else
 	if [ "${WINE_VERSION}" = "git" ]; then
-		git clone https://gitlab.winehq.org/wine/wine.git wine
+		git clone https://gitlab.com/DragoPayras228/wine wine
 		BUILD_NAME="${WINE_VERSION}-$(git -C wine rev-parse --short HEAD)"
 	else
 		BUILD_NAME="${WINE_VERSION}"
@@ -548,165 +548,4 @@ fi
 
 if [ ! -d wine ]; then
 	clear
-	echo "No Wine source code found!"
-	echo "Make sure that the correct Wine version is specified."
-	exit 1
-fi
-
-cd wine || exit 1
-if [ "$WINE_BRANCH" = "vanilla" ]; then
-git revert --no-commit 2bfe81e41f93ce75139e3a6a2d0b68eb2dcb8fa6 || {
-        echo "Error: Failed to revert one or two patches. Stopping."
-        exit 1
-    }
-    clear
-fi
-### Experimental addition to address space hackery
-if [ "$TERMUX_GLIBC" = "true" ]; then
-echo "Applying additional address space patch... (credits to Bylaws)"
-wget -O address-space.patch https://github.com/bylaws/wine/commit/c12890cafb580764c076e4231636cafaf6e35089.patch
-patch -p1 < address-space.patch || {
-        echo "This patch did not apply. Stopping..."
-	exit 1
-    }
-    clear
-fi
-
-###
-dlls/winevulkan/make_vulkan
-tools/make_requests
-tools/make_specfiles
-autoreconf -f
-cd "${BUILD_DIR}" || exit 1
-
-if [ "${DO_NOT_COMPILE}" = "true" ]; then
-	clear
-	echo "DO_NOT_COMPILE is set to true"
-	echo "Force exiting"
-	exit
-fi
-
-if ! command -v bwrap 1>/dev/null; then
-	echo "Bubblewrap is not installed on your system!"
-	echo "Please install it and run the script again"
-	exit 1
-fi
-
-if [ "${EXPERIMENTAL_WOW64}" = "true" ]; then
-    if [ ! -d "${BOOTSTRAP_X64}" ]; then
-        clear
-        echo "Bootstraps are required for compilation!"
-        exit 1
-    fi
-else    
-    if [ ! -d "${BOOTSTRAP_X64}" ] || [ ! -d "${BOOTSTRAP_X32}" ]; then
-        clear
-        echo "Bootstraps are required for compilation!"
-        exit 1
-    fi
-fi
-
-if [ "${EXPERIMENTAL_WOW64}" = "true" ]; then
-BWRAP64="build_with_bwrap"
-else
-BWRAP64="build_with_bwrap 64"
-BWRAP32="build_with_bwrap 32"
-fi
-
-if [ "${EXPERIMENTAL_WOW64}" = "true" ]; then
-
-export CROSSCC="${CROSSCC_X64}"
-export CROSSCXX="${CROSSCXX_X64}"
-export CFLAGS="${CFLAGS_X64}"
-export CXXFLAGS="${CFLAGS_X64}"
-export CROSSCFLAGS="${CROSSCFLAGS_X64}"
-export CROSSCXXFLAGS="${CROSSCFLAGS_X64}"
-
-mkdir "${BUILD_DIR}"/build64
-cd "${BUILD_DIR}"/build64 || exit
-${BWRAP64} "${BUILD_DIR}"/wine/configure --enable-archs=i386,x86_64 ${WINE_BUILD_OPTIONS} --prefix "${BUILD_DIR}"/wine-"${BUILD_NAME}"-amd64
-${BWRAP64} make -j8
-${BWRAP64} make install
-
-else
-
-export CROSSCC="${CROSSCC_X64}"
-export CROSSCXX="${CROSSCXX_X64}"
-export CFLAGS="${CFLAGS_X64}"
-export CXXFLAGS="${CFLAGS_X64}"
-export CROSSCFLAGS="${CROSSCFLAGS_X64}"
-export CROSSCXXFLAGS="${CROSSCFLAGS_X64}"
-
-mkdir "${BUILD_DIR}"/build64
-cd "${BUILD_DIR}"/build64 || exit
-${BWRAP64} "${BUILD_DIR}"/wine/configure --enable-win64 ${WINE_BUILD_OPTIONS} --prefix "${BUILD_DIR}"/wine-"${BUILD_NAME}"-amd64
-${BWRAP64} make -j8
-${BWRAP64} make install
-
-export CROSSCC="${CROSSCC_X32}"
-export CROSSCXX="${CROSSCXX_X32}"
-export CFLAGS="${CFLAGS_X32}"
-export CXXFLAGS="${CFLAGS_X32}"
-export CROSSCFLAGS="${CROSSCFLAGS_X32}"
-export CROSSCXXFLAGS="${CROSSCFLAGS_X32}"
-
-mkdir "${BUILD_DIR}"/build32-tools
-cd "${BUILD_DIR}"/build32-tools || exit
-PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib/i386-linux-gnu/pkgconfig ${BWRAP32} "${BUILD_DIR}"/wine/configure ${WINE_BUILD_OPTIONS} --prefix "${BUILD_DIR}"/wine-"${BUILD_NAME}"-x86
-${BWRAP32} make -j$(nproc)
-${BWRAP32} make install
-
-export CFLAGS="${CFLAGS_X64}"
-export CXXFLAGS="${CFLAGS_X64}"
-export CROSSCFLAGS="${CROSSCFLAGS_X64}"
-export CROSSCXXFLAGS="${CROSSCFLAGS_X64}"
-
-mkdir "${BUILD_DIR}"/build32
-cd "${BUILD_DIR}"/build32 || exit
-PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib/i386-linux-gnu/pkgconfig ${BWRAP32} "${BUILD_DIR}"/wine/configure --with-wine64="${BUILD_DIR}"/build64 --with-wine-tools="${BUILD_DIR}"/build32-tools ${WINE_BUILD_OPTIONS} --prefix "${BUILD_DIR}"/wine-${BUILD_NAME}-amd64
-${BWRAP32} make -j8
-${BWRAP32} make install
-
-fi
-
-echo
-echo "Compilation complete"
-echo "Creating and compressing archives..."
-
-cd "${BUILD_DIR}" || exit
-
-if touch "${scriptdir}"/write_test; then
-	rm -f "${scriptdir}"/write_test
-	result_dir="${scriptdir}"
-else
-	result_dir="${HOME}"
-fi
-
-export XZ_OPT="-9"
-
-if [ "${EXPERIMENTAL_WOW64}" = "true" ]; then
-	mv wine-${BUILD_NAME}-amd64 wine-${BUILD_NAME}-exp-wow64-amd64
-
-	builds_list="wine-${BUILD_NAME}-exp-wow64-amd64"
-else
-	builds_list="wine-${BUILD_NAME}-x86 wine-${BUILD_NAME}-amd64"
-fi
-
-for build in ${builds_list}; do
-	if [ -d "${build}" ]; then
-		rm -rf "${build}"/include "${build}"/share/applications "${build}"/share/man
-
-		if [ -f wine/wine-tkg-config.txt ]; then
-			cp wine/wine-tkg-config.txt "${build}"
-		fi
-
-		tar -Jcf "${build}".tar.xz "${build}"
-		mv "${build}".tar.xz "${result_dir}"
-	fi
-done
-
-rm -rf "${BUILD_DIR}"
-
-echo
-echo "Done"
-echo "The builds should be in ${result_dir}"
+	echo "No Wine sourc
